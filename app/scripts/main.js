@@ -40,7 +40,7 @@ $(document).ready(function () {
 			return noteNumberToNote(frequencyToNoteNumber(f));
 		}*/
 
-		window.addEventListener('DOMContentLoaded', function() {
+		function getVideo() {
 			var isStreaming = false,
 			    video = document.getElementById('video'),
 			    canvas = document.getElementById('canvas'),
@@ -91,14 +91,44 @@ $(document).ready(function () {
 
 
 			video.addEventListener('play', function() {
-	
-				// Every 3 second copy the video image to the canvas
-				setInterval(function() {
 
-					var red = [],
-					    green = [],
-					    blue = [],
-					    alpha = [];
+				var red = [],
+				    green = [],
+				    blue = [],
+				    alpha = [];
+
+			    function getCrossection(){
+			    	//console.log('getCrossection');
+
+				    var v, crossSection = [];
+
+				    for(v = 75; v < red.length; v = v + 74){
+
+				    	crossSection.push(v);
+
+				    }
+
+				    function runTheremin(){
+
+					    for(var l = 0; l < crossSection.length; l++){
+
+							theremin.setPitchBend( (red[crossSection[l]] + green[crossSection[l]] +  blue[crossSection[l]]) / 3000 );
+							theremin.volume = 1 -  (red[crossSection[l]] + green[crossSection[l]] +  blue[crossSection[l]]) / 3000;
+
+							if(l == crossSection.length){
+
+								runTheremin();
+
+							}
+
+					    }
+					}
+
+					runTheremin();
+
+				}
+	
+				setInterval(function() {
 
 					if (video.paused || video.ended) return;
 					con.fillRect(0, 0, w, h);
@@ -118,24 +148,19 @@ $(document).ready(function () {
 				            blue.push(data[index + 2]);
 				            alpha.push(data[index + 3]);
 
-
 				        }
-
 				    }
 
-				    // log out any pixel here
-				    console.log(red[1]);
+					getCrossection();
 
-				}, 3000);
-
+				}, 33);
 
 			}, false);
 
-		});
-
+		};
 
 		var audioProcess = function(event) {
-			console.log('Called audioProcess');
+			//console.log('Called audioProcess');
 
 			var buffer = event.outputBuffer,
 				bufferLeft = buffer.getChannelData( 0 ),
@@ -158,7 +183,7 @@ $(document).ready(function () {
 		}
 
 		var initAudio = function() {
-			console.log('Called initAudio');
+			//console.log('Called initAudio');
 
 			theremin = new Theremin();
 			
@@ -170,15 +195,6 @@ $(document).ready(function () {
 		}
 
 		if(AudioDetector.detects(['webAudioSupport'])) {
-
-			window.addEventListener('mousemove', function(e) {
-				pointerX = e.clientX;
-				pointerY = e.clientY;
-
-				theremin.setPitchBend( pointerX / window.innerWidth );
-				theremin.volume = 1 - pointerY / window.innerHeight;
-
-			}, false);
 			
 			initAudio();
 		}
@@ -187,7 +203,28 @@ $(document).ready(function () {
 
 			e.preventDefault();
 
-			playing = !playing;
+			var $this = $(this), videoReq = false;
+
+			if(!$this.hasClass('stop')){
+
+				if(videoReq === false){
+
+					videoReq = true;
+					getVideo();
+
+				}
+
+				playing = !playing;
+
+				$this.text('Stop').addClass('stop');
+
+			} else {
+
+				playing = !playing;
+
+				$this.text('Start').removeClass('stop');
+
+			}
 
 		}, false);
 
