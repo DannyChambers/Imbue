@@ -2,8 +2,11 @@
   "name": "imbue",
   "private": true,
   "dependencies": {
-    "modernizr": "~2.6.2",
-    "jquery": "~1.10.2"
+    "jquery": "~2.1.1",
+    "modernizr": "~2.8.1"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "mocha": "^5.2.0"
+  }
 }
