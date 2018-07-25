@@ -17,29 +17,6 @@ $(document).ready(function () {
 			canvas = $("#canvas"),
 			ctx = canvas.get()[0].getContext('2d');
 
-		/*var frequencyToNoteNumber = function(f) {
-			console.log('Called frequencyToNoteNumber');
-
-			return Math.round(12 * Math.log(f / 440.0) + 69);
-		}
-
-		var noteNumberToNote = function(n) {
-			console.log('Called noteNumberToNote');
-
-			var notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
-				name = n % 12,
-				octave = Math.floor(n / 12) - 1,
-				note = notes[name];
-
-			return note + (note.length < 2 ? '-' : '') + octave;
-		}
-
-		var frequencyToNote = function(f) {
-			console.log('Called frequencyToNote');
-
-			return noteNumberToNote(frequencyToNoteNumber(f));
-		}*/
-
 		function getVideo() {
 			var isStreaming = false,
 			    video = document.getElementById('video'),
@@ -164,7 +141,6 @@ $(document).ready(function () {
 
 			var buffer = event.outputBuffer,
 				bufferLeft = buffer.getChannelData( 0 ),
-				bufferRight = buffer.getChannelData( 1 ),
 				numSamples = bufferLeft.length,
 				synthOutputBuffer = [];
 
@@ -172,12 +148,10 @@ $(document).ready(function () {
 				synthOutputBuffer = theremin.getBuffer( numSamples );
 				for(var i = 0; i < synthOutputBuffer.length; i++) {
 					bufferLeft[i] = synthOutputBuffer[i];
-					bufferRight[i] = synthOutputBuffer[i];
 				}
 			} else {
 				for(var i = 0; i < numSamples; i++) {
 					bufferLeft[i] = 0;
-					bufferRight[i] = 0;
 				}
 			}
 		}
@@ -187,17 +161,27 @@ $(document).ready(function () {
 
 			theremin = new Theremin();
 			
-			audioContext = new webkitAudioContext();
-			jsNode = audioContext.createJavaScriptNode(4096);
+			var audioContext;
+
+			try {
+				// Fix up for prefixing
+				window.AudioContext = window.AudioContext||window.webkitAudioContext;
+				audioContext = new AudioContext();
+			}
+				catch(e) {
+				alert('Web Audio API is not supported in this browser');
+			}
+
+
+			//jsNode = audioContext.createJavaScriptNode(4096);
+
+			jsNode = audioContext.createScriptProcessor(2048, 1, 1);
 			jsNode.onaudioprocess = audioProcess;
 
 			jsNode.connect( audioContext.destination );
 		}
-
-		if(AudioDetector.detects(['webAudioSupport'])) {
 			
-			initAudio();
-		}
+		initAudio();
 
 		document.getElementById('start').addEventListener('click', function(e) {
 
