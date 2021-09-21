@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html class="no-js" lang="">
+	<head>
+		<meta charset="utf-8" />
+		<title>Imbue - A visual representation of colour</title>
+		<meta name="description" content="" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+		<link rel="preconnect" href="https://fonts.gstatic.com" />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Oswald:wght@200&display=swap"
+			rel="stylesheet"
+		/>
+
+		<style>
+			* {
+				box-sizing: border-box;
+				position: relative;
+				margin: 0;
+				padding: 0;
+			}
+
+			html,
+			body {
+				width: 100vw;
+				height: 100vh;
+				background: #ccc;
+				font-family: "Oswald", sans-serif;
+				display: flex;
+				justify-content: center;
+			}
+
+			#overlay {
+				display: none;
+				width: 100vw;
+				height: 100vh;
+				position: absolute;
+				top: 0;
+				left: 0;
+				background: rgba(1, 1, 1, 0.7);
+				z-index: 9999; /*To the Moon!*/
+			}
+
+			#overlay.visible {
+				display: table;
+			}
+
+			.modal {
+				height: 100%;
+				display: table-cell;
+				vertical-align: middle;
+			}
+
+			.modal-content {
+				background: white;
+				border-radius: 10px;
+				max-width: 768px;
+				margin: 0 auto;
+				padding: 66.6px 33.3px;
+				text-align: center;
+			}
+
+			h1 {
+				margin: 0 0 15px 0;
+				font-size: 80px;
+			}
+			h2 {
+				margin: 0 0 15px 0;
+				font-size: 40px;
+			}
+			p {
+				margin: 0 0 15px 0;
+				font-size: 20px;
+			}
+			button {
+				margin: 15px 0;
+				padding: 0 15px;
+				font-size: 16px;
+				line-height: 44px;
+				font-weight: bold;
+				text-align: center;
+			}
+
+			body > button {
+				position: fixed;
+				bottom: 33.3px;
+				right: 33.3px;
+				z-index: 999;
+			}
+			#video {
+				position: absolute;
+				top: 0;
+				left: 0;
+				/* display: none; */
+			}
+			#canvas {
+				height: 100vh;
+				/* aspect-ratio: 4 / 6; */
+				transform: scaleX(-1);
+			}
+		</style>
+	</head>
+
+	<body>
+		<div id="overlay" class="visible">
+			<div class="modal">
+				<div class="modal-content">
+					<h2>Warning!</h2>
+					<p>
+						This project generates an audio representation of visual
+						input.<br />
+						Please set your speakers or headphones to a moderate
+						volume before continuing.
+					</p>
+					<p>
+						To stop the experiment at any time, press the Stop
+						button
+					</p>
+
+					<button id="start-button">Continue</button>
+				</div>
+			</div>
+		</div>
+
+		<video autoplay id="video"></video>
+		<div class="stage">
+			<canvas id="canvas" class=""></canvas>
+		</div>
+
+		<button id="stop-button">Stop</button>
+
+		<script>
+			document.addEventListener("DOMContentLoaded", function () {
+				const canvas = document.querySelector("#canvas"),
+					ctx = canvas.getContext("2d");
+
+				//Start
+				const start = async () => {
+					console.log("Called start");
+
+					document
+						.querySelector("#overlay")
+						.setAttribute("class", "");
+
+					setupVideoStream();
+				};
+
+				//Stop
+				const stop = () => {
+					console.log("Called stop");
+
+					video.pause();
+
+					document
+						.querySelector("#overlay")
+						.setAttribute("class", "visible");
+				};
+
+				//setupVideoStream
+				const setupVideoStream = () => {
+					const constraints = {
+						audio: false,
+						video: { width: 300, height: 400 },
+					};
+
+					const video = document.querySelector("#video");
+
+					navigator.mediaDevices
+						.getUserMedia(constraints)
+						.then(handleSuccess);
+
+					function handleSuccess(stream) {
+						video.srcObject = stream;
+					}
+
+					setInterval(function () {
+						canvas.width = video.videoWidth;
+						canvas.height = video.videoHeight;
+						//ctx.filter = "grayscale(1)"; //Does this change the image data I'm able to collect? - Yes, Do it after collecting data
+						ctx.drawImage(video, 0, 0);
+					}, 200);
+				};
+
+				//buildSound
+				const buildSound = async () => {
+					console.log("Called buildSound");
+
+					//Turn it into something usable..
+					const processImageData = async () => {
+						console.log("called  processImageData");
+
+						let imageData = ctx.getImageData(
+							0,
+							0,
+							// video.videoWidth,
+							// video.videoHeight
+							100,
+							100
+						);
+
+						//Function to get the main colours from the image (How many?) - For choosing major or minor
+						function getColors(imageData) {
+							console.log("imageData: ", imageData);
+
+							let col,
+								colorsObj = {},
+								colorsArray = [];
+							let pixels, r, g, b, a;
+							r = g = b = a = 0;
+							for (
+								let i = 0, data = imageData.data;
+								i < data.length;
+								i += 4
+							) {
+								r = data[i];
+								g = data[i + 1];
+								b = data[i + 2];
+								a = data[i + 3]; // alpha
+								// skip pixels >50% transparent
+								if (a < 255 / 2) continue;
+
+								// https://stackoverflow.com/a/54070620/1487756
+								function rgb2hsv(r, g, b) {
+									let v = Math.max(r, g, b),
+										n = v - Math.min(r, g, b);
+									let h =
+										n &&
+										(v == r
+											? (g - b) / n
+											: v == g
+											? 2 + (b - r) / n
+											: 4 + (r - g) / n);
+									return [
+										60 * (h < 0 ? h + 6 : h),
+										v && n / v,
+										v,
+									];
+								}
+
+								col = rgb2hsv(r, g, b);
+								if (!colorsObj[col]) colorsObj[col] = 0;
+								colorsObj[col]++;
+							}
+
+							// const clrLkp = [
+							// 	["red", 0],
+							// 	["vermilion", 15],
+							// 	["brown", 20],
+							// 	["orange", 30],
+							// 	["safran", 45],
+							// 	["yellow", 60],
+							// 	["light green yellow", 75],
+							// 	["green yellow", 90],
+							// 	["limett", 105],
+							// 	["dark green", 120],
+							// 	["green", 120],
+							// 	["light blue-green", 135],
+							// 	["blue green", 150],
+							// 	["green cyan", 165],
+							// 	["cyan", 180],
+							// 	["blaucyan", 195],
+							// 	["green blue", 210],
+							// 	["light green blue", 225],
+							// 	["blue", 240],
+							// 	["indigo", 255],
+							// 	["violet", 270],
+							// 	["blue magenta", 285],
+							// 	["magenta", 300],
+							// 	["red magenta", 315],
+							// 	["blue red", 330],
+							// 	["light blue red", 345],
+							// ].reverse();
+
+							const clrLkp = [
+								["red", 0],
+								["yellow", 60],
+								["green", 105],
+								["blue", 180],
+								["purple", 255],
+								["red", 315],
+							].reverse();
+
+							Object.keys(colorsObj).forEach(function (key) {
+								const hsv2name = (h, s, v) =>
+									clrLkp.find(([clr, val]) => h >= val)[0];
+
+								const HSletray = key.split(",");
+
+								const colorName = hsv2name(
+									HSletray[0],
+									HSletray[1],
+									HSletray[2]
+								);
+
+								if (
+									colorsArray.some(
+										(e) => e.colorName === colorName
+									)
+								) {
+									colorsArray.map((color) => {
+										if (color.colorName === colorName) {
+											color.occurrence += colorsObj[key];
+										}
+									});
+								} else {
+									colorsArray.push({
+										colorHSV: key,
+										colorName: colorName,
+										occurrence: colorsObj[key],
+									});
+								}
+							});
+
+							colorsArray.sort(
+								(a, b) => b.occurrence - a.occurrence
+							);
+							colorsArray = colorsArray.slice(0, 10); //Now we have our array of (up to) 10 most common colours
+
+							return colorsArray;
+						}
+
+						const palette = await getColors(imageData);
+
+						console.log("palette: ", palette);
+						const speed = 3000 / palette.length;
+						const numberOfInstruments = palette.length > 5 ? 2 : 3; //If this is a 'busy' image in terms of colour, it will be faster and so we make it *less* crowded
+						const noteDurationRange = 1500 / palette.length;
+						console.log("noteDurationRange: ", noteDurationRange);
+						const fourBarSpaces = palette.length / 2; //If this is a 'busy' image in terms of colour, We will increase the frequenct of four bar breaks for certain instruments
+						let quality;
+						if (
+							palette[0].colorName === "blue" ||
+							palette[0].colorName === "green"
+						) {
+							quality = "minor";
+						} else if (
+							palette[0].colorName === "red" ||
+							palette[0].colorName === "yellow"
+						) {
+							quality = "major";
+						} else {
+							const qualityArray = ["minor", "major"];
+
+							let randomQuality =
+								qualityArray[
+									Math.floor(
+										Math.random() * qualityArray.length
+									)
+								];
+						}
+
+						const notes = {
+							c: [
+								32.703, 65.406, 130.813, 261.626, 523.251,
+								// 1046.502, 2093.005, 4186.009,
+							],
+							cs: [
+								34.648, 69.296, 138.591, 277.183, 554.365,
+								// 1108.731, 2217.461, 4434.922,
+							],
+							d: [
+								36.708, 73.416, 146.832, 293.665, 587.33,
+								// 1147.659, 2349.318, 4698.636,
+							],
+							ds: [
+								38.891, 77.782, 155.563, 311.127, 622.254,
+								// 1244.508, 2489.016, 4978.032,
+							],
+							e: [
+								41.203, 82.407, 164.814, 329.628, 659.255,
+								// 1318.51, 2637.02, 5274.041,
+							],
+							f: [
+								43.654, 87.307, 174.614, 349.228, 698.456,
+								// 1396.913, 2793.826, 5587.652,
+							],
+							fs: [
+								46.249, 92.499, 184.997, 369.994, 739.998,
+								// 1479.978, 2959.955, 5919.911,
+							],
+							g: [
+								48.999, 97.999, 195.998, 391.995, 783.991,
+								// 1567.982, 3135.963, 6271.927,
+							],
+							gs: [
+								51.913, 103.826, 207.652, 415.305, 830.609,
+								// 1661.219, 3322.438, 6644.875,
+							],
+							a: [
+								// 55.0, 110.0, 220.0, 440.0, 880.0, 1760.0,
+								// 3520.0, 7040.0,
+							],
+							as: [
+								58.27, 116.541, 233.082, 466.164, 932.328,
+								// 1864.665, 3729.31,
+							],
+							b: [
+								61.735, 123.471, 246.942, 493.883, 987.767,
+								// 1975.533, 3951.066,
+							],
+						};
+
+						const scales = {
+							major: [
+								{
+									name: "c_major_pentatonic_blues", //C, D, Eb, E, G, A,
+									notes: [
+										...notes.c,
+										...notes.d,
+										...notes.ds,
+										...notes.e,
+										...notes.g,
+										...notes.a,
+									],
+								},
+								{
+									name: "c_sharp_major_pentatonic_blues", //C#, D#, E, F, G#, A#,
+									notes: [
+										...notes.cs,
+										...notes.ds,
+										...notes.e,
+										...notes.f,
+										...notes.gs,
+										...notes.as,
+									],
+								},
+								{
+									name: "d_major_pentatonic_blues", //D, E, F, F#, A, B,
+									notes: [
+										...notes.d,
+										...notes.e,
+										...notes.f,
+										...notes.fs,
+										...notes.a,
+										...notes.b,
+									],
+								},
+							],
+							minor: [
+								{
+									name: "c_minor_pentatonic_blues", //C, Eb, F, F#, G, A#
+									notes: [
+										...notes.c,
+										...notes.ds,
+										...notes.f,
+										...notes.fs,
+										...notes.g,
+										...notes.as,
+									],
+								},
+								{
+									name: "d_flat_minor_pentatonic_blues", //C#, E, F#, G, G#, B
+									notes: [
+										...notes.cs,
+										...notes.e,
+										...notes.fs,
+										...notes.g,
+										...notes.gs,
+										...notes.b,
+									],
+								},
+								{
+									name: "d_minor_pentatonic_blues", //D, F, G, G#, A, C, D
+									notes: [
+										...notes.d,
+										...notes.f,
+										...notes.g,
+										...notes.g,
+										...notes.gs,
+										...notes.a,
+										...notes.c,
+										...notes.d,
+									],
+								},
+							],
+						};
+
+						const chosenScale =
+							scales[quality][
+								Math.floor(
+									Math.random() * scales[quality].length
+								)
+							];
+
+						console.log("chosenScale: ", chosenScale);
+
+						//Build our tune!
+						let soundsArray = [
+							[
+								//Beats
+								{ beat: "kick" },
+								{ beat: "kick" },
+								{ beat: "kick" },
+								{ beat: "kick" },
+								{ beat: "kick" },
+								{ beat: "kick" },
+								{ beat: "snare" },
+								{ beat: "kick" },
+								{ beat: "kick" },
+								{ beat: "snare" },
+								{ beat: "kick" },
+								{ beat: "snare" },
+								{ beat: "kick" },
+								{ beat: "snare" },
+								{ beat: "kick" },
+								{ beat: "snare" },
+							],
+						];
+
+						for (let i = 1; i < numberOfInstruments; i++) {
+							soundsArray.push([]);
+							for (let t = 0; t < 16; t++) {
+								soundsArray[i].push({
+									pitch: chosenScale.notes[
+										Math.floor(
+											Math.random() *
+												chosenScale.notes.length
+										)
+									],
+									duration: Math.floor(
+										Math.random() *
+											(noteDurationRange - 50) +
+											50
+									),
+								});
+							}
+						}
+
+						console.log("soundsArray: ", soundsArray);
+
+						return [speed, soundsArray];
+					};
+
+					const processedData = await processImageData();
+
+					return processedData;
+				};
+
+				//playSequence
+				const playSequence = ([speed, sequence]) => {
+					console.log("Called playSequence, speed: ", speed);
+					console.log("Called playSequence, sequence: ", sequence);
+
+					function createAudioContext(desiredSampleRate) {
+						let AudioCtor =
+							window.AudioContext || window.webkitAudioContext;
+						desiredSampleRate =
+							typeof desiredSampleRate === "number"
+								? desiredSampleRate
+								: 44100;
+						let context = new AudioCtor();
+						// Check if hack is necessary. Only occurs in iOS6+ devices
+						// and only when you first boot the iPhone, or play a audio/video
+						// with a different sample rate
+						if (
+							/(iPhone|iPad)/i.test(navigator.userAgent) &&
+							context.sampleRate !== desiredSampleRate
+						) {
+							let buffer = context.createBuffer(
+								1,
+								1,
+								desiredSampleRate
+							);
+							let dummy = context.createBufferSource();
+							dummy.buffer = buffer;
+							dummy.connect(context.destination);
+							dummy.start(0);
+							dummy.disconnect();
+							context.close();
+							// dispose old context
+							context = new AudioCtor();
+						}
+						return context;
+					}
+					let audioContext = new createAudioContext();
+					let mixGain = audioContext.createGain();
+					let filterGain = audioContext.createGain();
+
+					let output = document.getElementById("output");
+
+					const distortionCurve = (amount) => {
+						const numberOfSamples = 44100;
+						const curve = new Float32Array(numberOfSamples);
+						const deg = Math.PI / 180;
+						for (let i = 0; i < numberOfSamples; ++i) {
+							const x = (i * 2) / numberOfSamples - 1;
+							curve[i] =
+								((3 + amount) * x * 20 * deg) /
+								(Math.PI + amount * Math.abs(x));
+						}
+						return curve;
+					};
+
+					const kickdrum = () => {
+						let osc = audioContext.createOscillator();
+						let osc2 = audioContext.createOscillator();
+						let gainOsc = audioContext.createGain();
+						let gainOsc2 = audioContext.createGain();
+
+						osc.type = "triangle";
+						osc2.type = "sine";
+
+						gainOsc.gain.setValueAtTime(
+							1,
+							audioContext.currentTime
+						);
+						gainOsc.gain.exponentialRampToValueAtTime(
+							0.001,
+							audioContext.currentTime + 0.5
+						);
+						gainOsc.connect(audioContext.destination);
+						gainOsc2.gain.setValueAtTime(
+							1,
+							audioContext.currentTime
+						);
+						gainOsc2.gain.exponentialRampToValueAtTime(
+							0.001,
+							audioContext.currentTime + 0.5
+						);
+						gainOsc2.connect(audioContext.destination);
+						osc.frequency.setValueAtTime(
+							120,
+							audioContext.currentTime
+						);
+						osc.frequency.exponentialRampToValueAtTime(
+							0.001,
+							audioContext.currentTime + 0.5
+						);
+						osc2.frequency.setValueAtTime(
+							50,
+							audioContext.currentTime
+						);
+
+						//Connections
+						osc.connect(gainOsc);
+						osc2.connect(gainOsc2);
+						gainOsc2.connect(mixGain);
+						gainOsc.connect(mixGain);
+
+						mixGain.gain.value = 1;
+
+						osc.start(audioContext.currentTime);
+						osc2.start(audioContext.currentTime);
+						osc.stop(audioContext.currentTime + 0.5);
+						osc2.stop(audioContext.currentTime + 0.5);
+					};
+
+					const snare = () => {
+						var osc3 = audioContext.createOscillator();
+						var gainOsc3 = audioContext.createGain();
+
+						filterGain.gain.setValueAtTime(
+							1,
+							audioContext.currentTime
+						);
+						filterGain.gain.exponentialRampToValueAtTime(
+							0.01,
+							audioContext.currentTime + 0.2
+						);
+
+						osc3.type = "triangle";
+						osc3.frequency.value = 100;
+
+						gainOsc3.gain.value = 0;
+						gainOsc3.gain.setValueAtTime(
+							0,
+							audioContext.currentTime
+						);
+						//gainOsc3.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+						//Connections
+						osc3.connect(gainOsc3);
+						gainOsc3.connect(mixGain);
+
+						mixGain.gain.value = 1;
+
+						osc3.start(audioContext.currentTime);
+						osc3.stop(audioContext.currentTime + 0.2);
+
+						var node = audioContext.createBufferSource(),
+							buffer = audioContext.createBuffer(
+								1,
+								4096,
+								audioContext.sampleRate
+							),
+							data = buffer.getChannelData(0);
+
+						var filter = audioContext.createBiquadFilter();
+
+						filter.type = "highpass";
+						filter.frequency.setValueAtTime(
+							100,
+							audioContext.currentTime
+						);
+						filter.frequency.linearRampToValueAtTime(
+							1000,
+							audioContext.currentTime + 0.2
+						);
+
+						for (var i = 0; i < 4096; i++) {
+							data[i] = Math.random();
+						}
+
+						node.buffer = buffer;
+						node.loop = true;
+
+						//Connections
+						node.connect(filter);
+						filter.connect(filterGain);
+						filterGain.connect(mixGain);
+
+						node.start(audioContext.currentTime);
+						node.stop(audioContext.currentTime + 0.2);
+					};
+
+					const hihat = () => {
+						let gainOsc4 = audioContext.createGain();
+						let fundamental = 40;
+						let ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
+						let bandpass = audioContext.createBiquadFilter();
+						bandpass.type = "bandpass";
+						bandpass.frequency.value = 10000;
+						let highpass = audioContext.createBiquadFilter();
+						highpass.type = "highpass";
+						highpass.frequency.value = 7000;
+						ratios.forEach(function (ratio) {
+							let osc4 = audioContext.createOscillator();
+							osc4.type = "square";
+							osc4.frequency.value = fundamental * ratio;
+							osc4.connect(bandpass);
+							osc4.start(audioContext.currentTime);
+							osc4.stop(audioContext.currentTime + 0.05);
+						});
+
+						gainOsc4.gain.setValueAtTime(
+							1,
+							audioContext.currentTime
+						);
+						gainOsc4.gain.exponentialRampToValueAtTime(
+							0.01,
+							audioContext.currentTime + 0.05
+						);
+
+						bandpass.connect(highpass);
+						highpass.connect(gainOsc4);
+						gainOsc4.connect(mixGain);
+
+						mixGain.gain.value = 1;
+					};
+
+					//Instrument 1 --
+					const playInstrument1 = ({ pitch, duration }) => {
+						const instrument1 = audioContext.createOscillator();
+						instrument1.type = "sine";
+						instrument1.frequency.value = pitch;
+
+						const instrument1GainNode = audioContext.createGain();
+						instrument1GainNode.gain.value = 0.2;
+
+						instrument1.connect(instrument1GainNode);
+						instrument1GainNode.connect(audioContext.destination);
+
+						instrument1.start(audioContext.currentTime);
+						instrument1.stop(audioContext.currentTime + duration);
+					};
+
+					//Instrument 2 --
+					const playInstrument2 = ({ pitch, duration }) => {
+						const instrument2 = audioContext.createOscillator();
+						instrument2.type = "sawtooth";
+						instrument2.frequency.value = pitch;
+
+						const instrument2GainNode = audioContext.createGain();
+						instrument2GainNode.gain.value = 0.2;
+
+						instrument2.connect(instrument2GainNode);
+						instrument2GainNode.connect(audioContext.destination);
+
+						instrument2.start(audioContext.currentTime);
+						instrument2.stop(audioContext.currentTime + duration);
+					};
+
+					//Instrument 3 --
+					const playInstrument3 = ({ pitch, duration }) => {
+						const instrument3 = audioContext.createOscillator();
+						instrument3.type = "square";
+						instrument3.frequency.value = pitch;
+
+						const instrument3GainNode = audioContext.createGain();
+						instrument3GainNode.gain.value = 0.1;
+
+						instrument3.connect(instrument3GainNode);
+						instrument3GainNode.connect(audioContext.destination);
+
+						instrument3.start(audioContext.currentTime);
+						instrument3.stop(audioContext.currentTime + duration);
+					};
+
+					//////////
+
+					// Sequence loop --
+					let stopped = false,
+						i = 0;
+
+					setInterval(function () {
+						if (sequence[0][i].beat === "kick") {
+							kickdrum();
+						} else if (sequence[0][i].beat === "snare") {
+							snare();
+						} else {
+							//Space
+						}
+						// playInstrument1(sequence[0][i]);
+						// playInstrument2(sequence[2][i]);
+						// playInstrument3(sequence[2][i]);
+
+						i++;
+						if (i == sequence[0].length) {
+							i = 0;
+						}
+					}, speed);
+
+					// video.addEventListener("pause", function (e) {
+					// 	osc.stop();
+
+					// 	stopped = true;
+
+					// 	osc.onended = function () {
+					// 		osc.disconnect();
+					// 	};
+					// });
+				};
+
+				//Event handlers
+				document
+					.querySelector("#start-button")
+					.addEventListener("click", start);
+
+				document
+					.querySelector("#stop-button")
+					.addEventListener("click", stop);
+
+				video.addEventListener("play", async (e) => {
+					setTimeout(async () => {
+						const sequence = await buildSound();
+						playSequence(sequence);
+					}, 1000);
+				});
+			});
+		</script>
+	</body>
+</html>
